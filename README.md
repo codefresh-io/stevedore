@@ -11,9 +11,6 @@ Run `stevedore create --token {Codefresh JWT token}` to add all cluster from you
 `stevedore create --token {Codefresh token} --config {another kube config valid file}`
 
 
-# Run in docker container
-`docker run -v ~/.kube/config:/config codefresh/stevedore create --token {Codefresh token}  --config /config`
-
 # Todo:
 * [ ] Tests!
 * [ ] Support interactive mode
