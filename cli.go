@@ -18,15 +18,17 @@ func setupCli() *cli.App {
 }
 
 var (
-	codefreshJwt   string
-	kubeConfigPath string
+	codefreshJwt     string
+	kubeConfigPath   string
+	runOnAllContexts bool
+	runOnContext     string
 )
 
 func setupCommands(app *cli.App) {
 	app.Commands = []cli.Command{
 		{
 			Name:        "create",
-			Description: "Create clusters in Codefresh",
+			Description: "Create clusters in Codefresh. Default is to add current-context",
 			Action:      create,
 			Before: func(c *cli.Context) error {
 				log.SetLevel(log.WarnLevel)
@@ -47,7 +49,17 @@ func setupCommands(app *cli.App) {
 			Flags: []cli.Flag{
 				cli.BoolFlag{
 					Name:  "verbose, v",
-					Usage: "Turn on verbose mode, default is Warning",
+					Usage: "Turn on verbose mode",
+				},
+				cli.BoolFlag{
+					Name:        "all, a",
+					Usage:       "Add all clusters from config file, default is only current context",
+					Destination: &runOnAllContexts,
+				},
+				cli.StringFlag{
+					Name:        "context, c",
+					Usage:       "Add spesific cluster",
+					Destination: &runOnContext,
 				},
 				cli.StringFlag{
 					Name:        "token",

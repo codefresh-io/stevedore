@@ -19,66 +19,122 @@ import (
 
 var baseCodefreshURL = "https://g.codefresh.io/"
 
-func create(cli *cli.Context) {
+func getConfigOrDie() *api.Config {
+	return clientcmd.GetConfigFromFileOrDie(kubeConfigPath)
+}
 
-	cnf := clientcmd.GetConfigFromFileOrDie(kubeConfigPath)
-	c := *cnf
-	override := clientcmd.ConfigOverrides{
+func getDefaultOverride() clientcmd.ConfigOverrides {
+	return clientcmd.ConfigOverrides{
 		ClusterInfo: api.Cluster{
 			Server: "",
 		},
 	}
-	for contextName := range c.Contexts {
-		logger := log.WithFields(log.Fields{
-			"context_name": contextName,
-		})
-		logger.Info("Found context")
-		config := clientcmd.NewNonInteractiveClientConfig(c, contextName, &override, nil)
-		clientCnf, e := config.ClientConfig()
-
-		if e != nil {
-			msg := fmt.Sprintf("Failed to create config with error:\n%s\n\n", e)
-			logger.Warn(msg)
-			continue
-		}
-		logger.Info("Created config for context")
-
-		clientset, e := kubernetes.NewForConfig(clientCnf)
-		if e != nil {
-			msg := fmt.Sprintf("Failed to create kubernetes client with error:\n%s\n\n", e)
-			logger.Warn(msg)
-			continue
-		}
-		logger.Info("Created client set for context")
-
-		sa, e := clientset.CoreV1().ServiceAccounts("default").Get("default", metav1.GetOptions{})
-		if e != nil {
-			msg := fmt.Sprintf("Failed to get service account token with error:\n%s\n\n", e)
-			logger.Warn(msg)
-			continue
-		}
-		secretName := string(sa.Secrets[0].Name)
-		namespace := sa.Secrets[0].Namespace
-		logger.Info(fmt.Sprintf("Found service account accisiated with secret: %s in namespace %s\n", secretName, namespace))
-
-		secret, e := clientset.CoreV1().Secrets("default").Get(secretName, metav1.GetOptions{})
-		if e != nil {
-			msg := fmt.Sprintf("Failed to get secrets with error:\n%s\n\n", e)
-			logger.Warn(msg)
-			continue
-		}
-		logger.Info(fmt.Sprintf("Found secret"))
-
-		logger.Info(fmt.Sprintf("Creating cluster in Codefresh"))
-		body, e := addCluser(clientCnf.Host, contextName, secret.Data["token"], secret.Data["ca.crt"])
-		if e != nil {
-			msg := fmt.Sprintf("Failed to add cluster with error:\n%s\n\n", e)
-			logger.Warn(msg)
-			continue
-		}
-		logger.Warn(fmt.Sprintf("Added!\n%s\n\n", string(body)))
+}
+func create(cli *cli.Context) {
+	cnf := getConfigOrDie()
+	c := *cnf
+	if runOnAllContexts {
+		goOverAllContexts(c)
+	} else if runOnContext != "" {
+		getOverContextByName(c, runOnContext)
+	} else {
+		goOverCurrentContext(c)
 	}
 	log.Info("Operation is done, check your account setting")
+}
+
+func getLogger(name string) *log.Entry {
+	return log.WithFields(log.Fields{
+		"context_name": name,
+	})
+}
+
+func goOverAllContexts(cnf api.Config) {
+	contexts := cnf.Contexts
+	for contextName := range contexts {
+		logger := getLogger(contextName)
+		logger.Info("Working on context")
+		logger.Info("Creating config")
+		override := getDefaultOverride()
+		config := clientcmd.NewNonInteractiveClientConfig(cnf, contextName, &override, nil)
+		err := goOverContext(contextName, config, logger)
+		if err != nil {
+			continue
+		}
+	}
+
+}
+
+func getOverContextByName(cnf api.Config, contextName string) {
+	override := getDefaultOverride()
+	config := clientcmd.NewNonInteractiveClientConfig(cnf, contextName, &override, nil)
+	logger := getLogger(contextName)
+	goOverContext(contextName, config, logger)
+}
+
+func goOverCurrentContext(cnf api.Config) error {
+	override := getDefaultOverride()
+	config := clientcmd.NewDefaultClientConfig(cnf, &override)
+	rawConfig, err := config.RawConfig()
+	contextName := rawConfig.CurrentContext
+	logger := getLogger(contextName)
+	if err != nil {
+		return err
+	}
+	goOverContext(contextName, config, logger)
+	return nil
+}
+
+func goOverContext(contextName string, config clientcmd.ClientConfig, logger *log.Entry) error {
+	clientCnf, e := config.ClientConfig()
+	if e != nil {
+		message := fmt.Sprintf("Failed to create config with error:\n%s", e)
+		logger.Warn(message)
+		return e
+	}
+	logger.Info("Created config for context")
+
+	logger.Info("Creating rest client")
+	clientset, e := kubernetes.NewForConfig(clientCnf)
+	if e != nil {
+		message := fmt.Sprintf("Failed to create kubernetes client with error:\n%s", e)
+		logger.Warn(message)
+		return e
+	}
+	logger.Info("Created client set for context")
+
+	logger.Info("Fetching service account from cluster")
+	sa, e := clientset.CoreV1().ServiceAccounts("default").Get("default", metav1.GetOptions{})
+	if e != nil {
+		message := fmt.Sprintf("Failed to get service account token with error:\n%s", e)
+		logger.Warn(message)
+		return e
+	}
+	secretName := string(sa.Secrets[0].Name)
+	namespace := sa.Namespace
+	logger.WithFields(log.Fields{
+		"secret_name": secretName,
+		"namespace":   namespace,
+	}).Info(fmt.Sprint("Found service account accisiated with secret"))
+
+	logger.Info("Fetching secret from cluster")
+	secret, e := clientset.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
+	if e != nil {
+		message := fmt.Sprintf("Failed to get secrets with error:\n%s", e)
+		logger.Warn(message)
+		return e
+	}
+	logger.Info(fmt.Sprint("Found secret"))
+
+	logger.Info(fmt.Sprint("Creating cluster in Codefresh"))
+	_, e = addCluser(clientCnf.Host, contextName, secret.Data["token"], secret.Data["ca.crt"])
+	if e != nil {
+		message := fmt.Sprintf("Failed to add cluster with error:\n%s", e)
+		logger.Error(message)
+		return e
+	}
+	logger.Warn(fmt.Sprint("Cluster added!"))
+	return nil
 }
 
 func addCluser(host string, contextName string, token []byte, crt []byte) ([]byte, error) {
@@ -108,9 +164,14 @@ func addCluser(host string, contextName string, token []byte, crt []byte) ([]byt
 		return nil, err
 	}
 	defer res.Body.Close()
+
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
+	}
+	if res.StatusCode != 201 {
+		err := errors.New(string(body))
+		return nil, fmt.Errorf("Failed to create cluster %s", err)
 	}
 	return body, nil
 }
