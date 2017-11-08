@@ -16,7 +16,7 @@ docker run \
 -e GOOGLE_APPLICATION_CREDENTIALS=/.config/gcloud/application_default_credentials.json \
 -v ~/.kube/config:/config \
 -v ~/.config/gcloud/:/.config/gcloud \
-stevedore create
+codefresh/stevedore create
 ```
 GOOGLE_APPLICATION_CREDENTIALS - needed when you have clusters that are hosted in Google
 
