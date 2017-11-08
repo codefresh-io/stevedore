@@ -76,8 +76,9 @@ func create(cli *cli.Context) {
 			logger.Warn(msg)
 			continue
 		}
-		logger.Info(fmt.Sprintf("%s\n\n", string(body)))
+		logger.Warn(fmt.Sprintf("Added!\n%s\n\n", string(body)))
 	}
+	log.Info("Operation is done, check your account setting")
 }
 
 func addCluser(host string, contextName string, token []byte, crt []byte) ([]byte, error) {
