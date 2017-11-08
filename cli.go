@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -28,17 +27,6 @@ func setupCommands(app *cli.App) {
 			Name:        "create",
 			Description: "Create clusters in Codefresh",
 			Action:      create,
-			Before: func(c *cli.Context) error {
-				jwtFromOsEnv := os.Getenv("CODEFRESH_TOKEN")
-				if jwtFromOsEnv != "" {
-					c.Set("token", jwtFromOsEnv)
-				}
-				if !c.IsSet("token") {
-					fmt.Printf("not set")
-					return errors.New("--token nigther CODEFREHS_TOKEN is set")
-				}
-				return nil
-			},
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:        "token",
