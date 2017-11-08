@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -19,16 +19,8 @@ import (
 
 var baseCodefreshURL = "https://g.codefresh.io/"
 
-func init() {
-	// used to debug
-	url := os.Getenv("CODEFRESH_URL")
-	if url != "" {
-		fmt.Printf("Using other url %s\n", url)
-		baseCodefreshURL = url
-	}
-}
-
 func create(cli *cli.Context) {
+
 	cnf := clientcmd.GetConfigFromFileOrDie(kubeConfigPath)
 	c := *cnf
 	override := clientcmd.ConfigOverrides{
@@ -37,57 +29,54 @@ func create(cli *cli.Context) {
 		},
 	}
 	for contextName := range c.Contexts {
-		fmt.Println("Found context", contextName)
+		logger := log.WithFields(log.Fields{
+			"context_name": contextName,
+		})
+		logger.Info("Found context")
 		config := clientcmd.NewNonInteractiveClientConfig(c, contextName, &override, nil)
 		clientCnf, e := config.ClientConfig()
 
 		if e != nil {
-			fmt.Println("Error!!")
-			fmt.Println(e)
-			fmt.Printf("\n\n")
+			msg := fmt.Sprintf("Failed to create config with error:\n%s\n\n", e)
+			logger.Warn(msg)
 			continue
 		}
-		fmt.Println("Created config for context", contextName)
+		logger.Info("Created config for context")
 
 		clientset, e := kubernetes.NewForConfig(clientCnf)
 		if e != nil {
-			fmt.Println(e)
-			fmt.Printf("\n\n")
+			msg := fmt.Sprintf("Failed to create kubernetes client with error:\n%s\n\n", e)
+			logger.Warn(msg)
 			continue
 		}
-		fmt.Println("Created client set for context", contextName)
+		logger.Info("Created client set for context")
 
 		sa, e := clientset.CoreV1().ServiceAccounts("default").Get("default", metav1.GetOptions{})
 		if e != nil {
-			fmt.Println("Error!!")
-			fmt.Println(e)
-			fmt.Printf("\n\n")
+			msg := fmt.Sprintf("Failed to get service account token with error:\n%s\n\n", e)
+			logger.Warn(msg)
 			continue
 		}
 		secretName := string(sa.Secrets[0].Name)
 		namespace := sa.Secrets[0].Namespace
-		fmt.Printf("Found service account accisiated with secret: %s on context %s in namespace %s\n", secretName, contextName, namespace)
+		logger.Info(fmt.Sprintf("Found service account accisiated with secret: %s in namespace %s\n", secretName, namespace))
 
 		secret, e := clientset.CoreV1().Secrets("default").Get(secretName, metav1.GetOptions{})
 		if e != nil {
-			fmt.Println("Error!!")
-			fmt.Println(e)
-			fmt.Printf("\n\n")
+			msg := fmt.Sprintf("Failed to get secrets with error:\n%s\n\n", e)
+			logger.Warn(msg)
 			continue
 		}
-		fmt.Println("Found secret")
+		logger.Info(fmt.Sprintf("Found secret"))
 
-		fmt.Println("Creating cluster in Codefresh")
+		logger.Info(fmt.Sprintf("Creating cluster in Codefresh"))
 		body, e := addCluser(clientCnf.Host, contextName, secret.Data["token"], secret.Data["ca.crt"])
 		if e != nil {
-			fmt.Println("Error!!")
-			fmt.Println(e)
-			fmt.Printf("\n\n")
+			msg := fmt.Sprintf("Failed to add cluster with error:\n%s\n\n", e)
+			logger.Warn(msg)
 			continue
 		}
-		fmt.Println(string(body))
-
-		fmt.Printf("\n\n")
+		logger.Info(fmt.Sprintf("%s\n\n", string(body)))
 	}
 }
 
@@ -137,9 +126,7 @@ func testConnection(payload *requestPayload) error {
 	req.Header.Add("content-type", "application/json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		fmt.Println("Error during test cluster")
-		fmt.Println(err)
-		fmt.Printf("\n\n")
+		return err
 	}
 	defer res.Body.Close()
 	_, err = ioutil.ReadAll(res.Body)
@@ -149,7 +136,6 @@ func testConnection(payload *requestPayload) error {
 	if res.StatusCode != 200 {
 		return errors.New("Failed to test cluster")
 	}
-	fmt.Println("Test cluster passed")
 	return nil
 }
 

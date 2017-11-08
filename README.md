@@ -14,5 +14,5 @@ Run `stevedore create --token {Codefresh JWT token}` to add all cluster from you
 # Todo:
 * [ ] Tests!
 * [ ] Support interactive mode
-* [ ] Support verbose/debug mode
+* [X] Support verbose/debug mode
 * [ ] Support service-accounts from not default namespace

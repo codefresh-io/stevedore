@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -27,7 +28,27 @@ func setupCommands(app *cli.App) {
 			Name:        "create",
 			Description: "Create clusters in Codefresh",
 			Action:      create,
+			Before: func(c *cli.Context) error {
+				log.SetLevel(log.WarnLevel)
+				log.SetFormatter(&log.TextFormatter{})
+				if c.IsSet("verbose") {
+					log.SetLevel(log.InfoLevel)
+				}
+
+				url := os.Getenv("CODEFRESH_URL")
+				if url != "" {
+					log.SetLevel(log.DebugLevel)
+					log.Debug(fmt.Sprintf("Using other url %s\n", url))
+					baseCodefreshURL = url
+				}
+
+				return nil
+			},
 			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "verbose, v",
+					Usage: "Turn on verbose mode, default is Warning",
+				},
 				cli.StringFlag{
 					Name:        "token",
 					Usage:       "Codefresh JWT token",
