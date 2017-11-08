@@ -93,7 +93,7 @@ func addCluser(host string, contextName string, token []byte, crt []byte, jwt st
 	}
 	mar, _ := json.Marshal(payload)
 	p := strings.NewReader(string(mar))
-	err := testConnections(payload, jwt)
+	err := testConnection(payload, jwt)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func addCluser(host string, contextName string, token []byte, crt []byte, jwt st
 	return body, nil
 }
 
-func testConnections(payload *requestPayload, jwt string) error {
+func testConnection(payload *requestPayload, jwt string) error {
 	url := "http://g.codefresh.io/api/kubernetes/test"
 	mar, _ := json.Marshal(payload)
 	p := strings.NewReader(string(mar))
