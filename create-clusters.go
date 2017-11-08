@@ -29,9 +29,7 @@ func init() {
 }
 
 func create(cli *cli.Context) {
-	pathToKubeConfig := cli.String("config")
-	jwt := cli.String("token")
-	cnf := clientcmd.GetConfigFromFileOrDie(pathToKubeConfig)
+	cnf := clientcmd.GetConfigFromFileOrDie(kubeConfigPath)
 	c := *cnf
 	override := clientcmd.ConfigOverrides{
 		ClusterInfo: api.Cluster{
@@ -80,7 +78,7 @@ func create(cli *cli.Context) {
 		fmt.Println("Found secret")
 
 		fmt.Println("Creating cluster in Codefresh")
-		body, e := addCluser(clientCnf.Host, contextName, secret.Data["token"], secret.Data["ca.crt"], jwt)
+		body, e := addCluser(clientCnf.Host, contextName, secret.Data["token"], secret.Data["ca.crt"])
 		if e != nil {
 			fmt.Println("Error!!")
 			fmt.Println(e)
@@ -93,7 +91,7 @@ func create(cli *cli.Context) {
 	}
 }
 
-func addCluser(host string, contextName string, token []byte, crt []byte, jwt string) ([]byte, error) {
+func addCluser(host string, contextName string, token []byte, crt []byte) ([]byte, error) {
 	url := baseCodefreshURL + "api/clusters/local/cluster"
 	payload := &requestPayload{
 		Type:                "sat",
@@ -105,7 +103,7 @@ func addCluser(host string, contextName string, token []byte, crt []byte, jwt st
 	}
 	mar, _ := json.Marshal(payload)
 	p := strings.NewReader(string(mar))
-	err := testConnection(payload, jwt)
+	err := testConnection(payload)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +111,7 @@ func addCluser(host string, contextName string, token []byte, crt []byte, jwt st
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("X-Access-Token", jwt)
+	req.Header.Add("X-Access-Token", codefreshJwt)
 	req.Header.Add("content-type", "application/json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -127,7 +125,7 @@ func addCluser(host string, contextName string, token []byte, crt []byte, jwt st
 	return body, nil
 }
 
-func testConnection(payload *requestPayload, jwt string) error {
+func testConnection(payload *requestPayload) error {
 	url := baseCodefreshURL + "api/kubernetes/test"
 	mar, _ := json.Marshal(payload)
 	p := strings.NewReader(string(mar))
@@ -135,7 +133,7 @@ func testConnection(payload *requestPayload, jwt string) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Add("X-Access-Token", jwt)
+	req.Header.Add("X-Access-Token", codefreshJwt)
 	req.Header.Add("content-type", "application/json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
