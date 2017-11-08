@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/urfave/cli"
@@ -15,6 +16,17 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 )
+
+var baseCodefreshURL = "https://g.codefresh.io/"
+
+func init() {
+	// used to debug
+	url := os.Getenv("CODEFRESH_URL")
+	if url != "" {
+		fmt.Printf("Using other url %s\n", url)
+		baseCodefreshURL = url
+	}
+}
 
 func create(cli *cli.Context) {
 	pathToKubeConfig := cli.String("config")
@@ -82,7 +94,7 @@ func create(cli *cli.Context) {
 }
 
 func addCluser(host string, contextName string, token []byte, crt []byte, jwt string) ([]byte, error) {
-	url := "http://g.codefresh.io/api/clusters/local/cluster"
+	url := baseCodefreshURL + "api/clusters/local/cluster"
 	payload := &requestPayload{
 		Type:                "sat",
 		ProviderAgent:       "custom",
@@ -116,7 +128,7 @@ func addCluser(host string, contextName string, token []byte, crt []byte, jwt st
 }
 
 func testConnection(payload *requestPayload, jwt string) error {
-	url := "http://g.codefresh.io/api/kubernetes/test"
+	url := baseCodefreshURL + "api/kubernetes/test"
 	mar, _ := json.Marshal(payload)
 	p := strings.NewReader(string(mar))
 	req, err := http.NewRequest("POST", url, p)
