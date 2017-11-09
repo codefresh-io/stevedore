@@ -40,6 +40,7 @@ func create(cli *cli.Context) {
 	} else {
 		goOverCurrentContext(c)
 	}
+	reportResult()
 	log.Info("Operation is done, check your account setting")
 }
 
@@ -59,6 +60,7 @@ func goOverAllContexts(cnf api.Config) {
 		config := clientcmd.NewNonInteractiveClientConfig(cnf, contextName, &override, nil)
 		err := goOverContext(contextName, config, logger)
 		if err != nil {
+			addClusterToFinalReport(contextName, failed, err.Error())
 			continue
 		}
 	}
@@ -69,20 +71,26 @@ func getOverContextByName(cnf api.Config, contextName string) {
 	override := getDefaultOverride()
 	config := clientcmd.NewNonInteractiveClientConfig(cnf, contextName, &override, nil)
 	logger := getLogger(contextName)
-	goOverContext(contextName, config, logger)
+	err := goOverContext(contextName, config, logger)
+	if err != nil {
+		addClusterToFinalReport(contextName, failed, err.Error())
+	}
 }
 
-func goOverCurrentContext(cnf api.Config) error {
+func goOverCurrentContext(cnf api.Config) {
 	override := getDefaultOverride()
 	config := clientcmd.NewDefaultClientConfig(cnf, &override)
 	rawConfig, err := config.RawConfig()
+	if err != nil {
+		addClusterToFinalReport("current-context", failed, err.Error())
+	}
 	contextName := rawConfig.CurrentContext
 	logger := getLogger(contextName)
+
+	err = goOverContext(contextName, config, logger)
 	if err != nil {
-		return err
+		addClusterToFinalReport(contextName, failed, err.Error())
 	}
-	goOverContext(contextName, config, logger)
-	return nil
 }
 
 func goOverContext(contextName string, config clientcmd.ClientConfig, logger *log.Entry) error {
@@ -127,12 +135,13 @@ func goOverContext(contextName string, config clientcmd.ClientConfig, logger *lo
 	logger.Info(fmt.Sprint("Found secret"))
 
 	logger.Info(fmt.Sprint("Creating cluster in Codefresh"))
-	_, e = addCluser(clientCnf.Host, contextName, secret.Data["token"], secret.Data["ca.crt"])
+	result, e := addCluser(clientCnf.Host, contextName, secret.Data["token"], secret.Data["ca.crt"])
 	if e != nil {
 		message := fmt.Sprintf("Failed to add cluster with error:\n%s", e)
 		logger.Error(message)
 		return e
 	}
+	addClusterToFinalReport(contextName, success, string(result))
 	logger.Warn(fmt.Sprint("Cluster added!"))
 	return nil
 }
