@@ -43,15 +43,5 @@ docker run \
 codefresh/stevedore create --all
 ```
 
-# Find you Codefresh JWT token
-* Go to `https://g.codefresh.io/api/`
-* Copy the token on the right side
-
-## More functionallity
-`stevedore create --token {Codefresh token} --config {another kube config valid file}`
-
-# Todo:
-* [ ] Support interactive mode
-* [X] Support verbose/debug mode
-* [ ] Support service-accounts from not default namespace
-* [ ] Dry run
+# Generate Codefresh token
+* https://g.codefresh.io/account-conf/tokens
