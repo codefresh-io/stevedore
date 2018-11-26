@@ -1,6 +1,10 @@
 builds:
 - env:
   - CGO_ENABLED=0
+  goos:
+    - darwin
+    - linux
+    - windows
 archive:
   replacements:
     darwin: Darwin
@@ -8,6 +12,9 @@ archive:
     windows: Windows
     386: i386
     amd64: x86_64
+  format_overrides:
+  - goos: windows
+    format: zip
 checksum:
   name_template: 'checksums.txt'
 snapshot:
