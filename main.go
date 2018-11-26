@@ -3,6 +3,8 @@ package main
 import (
 	"os"
 	"os/signal"
+
+	"github.com/codefresh-io/stevedore/pkg/cmd"
 )
 
 const (
@@ -11,7 +13,7 @@ const (
 
 func main() {
 	handleUnexpectedExit()
-	app := setupCli()
+	app := cmd.SetupCli()
 	app.Run(os.Args)
 }
 
@@ -20,7 +22,6 @@ func handleUnexpectedExit() {
 	signal.Notify(c, os.Interrupt)
 	go func() {
 		for _ = range c {
-			reportResult()
 			os.Exit(1)
 		}
 	}()
