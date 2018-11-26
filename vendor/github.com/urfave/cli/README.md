@@ -32,9 +32,7 @@ applications in an expressive way.
     + [Alternate Names](#alternate-names)
     + [Ordering](#ordering)
     + [Values from the Environment](#values-from-the-environment)
-    + [Values from files](#values-from-files)
     + [Values from alternate input sources (YAML, TOML, and others)](#values-from-alternate-input-sources-yaml-toml-and-others)
-    + [Precedence](#precedence)
   * [Subcommands](#subcommands)
   * [Subcommands categories](#subcommands-categories)
   * [Exit code](#exit-code)
@@ -588,41 +586,6 @@ func main() {
 }
 ```
 
-#### Values from files
-
-You can also have the default value set from file via `FilePath`.  e.g.
-
-<!-- {
-  "args": ["&#45;&#45;help"],
-  "output": "password for the mysql database"
-} -->
-``` go
-package main
-
-import (
-  "os"
-
-  "github.com/urfave/cli"
-)
-
-func main() {
-  app := cli.NewApp()
-
-  app.Flags = []cli.Flag {
-    cli.StringFlag{
-      Name: "password, p",
-      Usage: "password for the mysql database",
-      FilePath: "/etc/mysql/password",
-    },
-  }
-
-  app.Run(os.Args)
-}
-```
-
-Note that default values set from file (e.g. `FilePath`) take precedence over
-default values set from the enviornment (e.g. `EnvVar`).
-
 #### Values from alternate input sources (YAML, TOML, and others)
 
 There is a separate package altsrc that adds support for getting flag values
@@ -692,15 +655,6 @@ func main() {
   app.Run(os.Args)
 }
 ```
-
-#### Precedence
-
-The precedence for flag value sources is as follows (highest to lowest):
-
-0. Command line flag value from user
-0. Environment variable (if specified)
-0. Configuration file (if specified)
-0. Default defined on the flag
 
 ### Subcommands
 
@@ -797,11 +751,11 @@ func main() {
     },
     {
       Name:     "add",
-      Category: "Template actions",
+      Category: "template",
     },
     {
       Name:     "remove",
-      Category: "Template actions",
+      Category: "template",
     },
   }
 
