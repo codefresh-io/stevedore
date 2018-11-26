@@ -20,6 +20,7 @@ OPTIONS:
    --verbose, -v              Turn on verbose mode
    --all, -a                  Add all clusters from config file, default is only current context
    --context value, -c value  Add spesific cluster
+   --api-host value           Codefresh API host (default: "http://g.codefresh.io/") [$CODEFRESH_URL]
    --token value              Codefresh API Token [$CODEFRESH_TOKEN]
    --config value             Kubernetes config file to be used as input (default: "/Users/oleg/.kube/config") [$KUBECONFIG]
 ```
