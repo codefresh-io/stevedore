@@ -17,7 +17,7 @@ func Init(c *cli.Context) {
 	if runOnAllContexts {
 		kubernetesAPI.GoOverAllContexts()
 	} else if runOnContext != "" {
-		kubernetesAPI.GoOverContextByName(runOnContext)
+		kubernetesAPI.GoOverContextByName(runOnContext, c.String("namespace"), c.String("serviceaccount"))
 	} else {
 		kubernetesAPI.GoOverCurrentContext()
 	}

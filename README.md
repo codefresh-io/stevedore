@@ -22,7 +22,7 @@ OPTIONS:
    --context value, -c value  Add spesific cluster
    --api-host value           Codefresh API host (default: "http://g.codefresh.io/") [$CODEFRESH_URL]
    --token value              Codefresh API Token [$CODEFRESH_TOKEN]
-   --config value             Kubernetes config file to be used as input (default: "/Users/oleg/.kube/config") [$KUBECONFIG]
+   --config value             Kubernetes config file to be used as input (default: "") [$KUBECONFIG]
 ```
 
 # Run as docker container
