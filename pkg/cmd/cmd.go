@@ -77,7 +77,7 @@ func setupCommands(app *cli.App) {
 				},
 				cli.BoolFlag{
 					Name:  "behind-firewall, b",
-					Usage: "Spesify whenever the cluster if behined firewall (only with --context)",
+					Usage: "Spesify whenever the cluster is behined firewall (only with --context)",
 				},
 				cli.StringFlag{
 					Name:   "name-overwrite",
