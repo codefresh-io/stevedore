@@ -47,10 +47,6 @@ type getOverContextOptions struct {
 	name           string
 }
 
-func createCluster() {
-
-}
-
 func goOverContext(options *getOverContextOptions) error {
 	var host string
 	var ca []byte
