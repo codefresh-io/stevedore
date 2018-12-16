@@ -12,7 +12,7 @@ import (
 type (
 	API interface {
 		Test(*requestPayload) error
-		Create(string, string, []byte, []byte) ([]byte, error)
+		Create(string, string, []byte, []byte, bool) ([]byte, error)
 	}
 
 	codefreshAPI struct {
@@ -27,6 +27,7 @@ type (
 		Selector            string `json:"selector"`
 		ServiceAccountToken []byte `json:"serviceAccountToken"`
 		Host                string `json:"host"`
+		BehinedFirewall     bool   `json:"behindFirewall"`
 	}
 )
 
@@ -55,7 +56,7 @@ func (api *codefreshAPI) Test(payload *requestPayload) error {
 	return nil
 }
 
-func (api *codefreshAPI) Create(host string, name string, saToken []byte, crt []byte) ([]byte, error) {
+func (api *codefreshAPI) Create(host string, name string, saToken []byte, crt []byte, bf bool) ([]byte, error) {
 	url := api.baseURL + "api/clusters/local/cluster"
 	payload := &requestPayload{
 		Type:                "sat",
@@ -64,12 +65,15 @@ func (api *codefreshAPI) Create(host string, name string, saToken []byte, crt []
 		Selector:            name,
 		ServiceAccountToken: saToken,
 		ClientCa:            crt,
+		BehinedFirewall:     bf,
 	}
 	mar, _ := json.Marshal(payload)
 	p := strings.NewReader(string(mar))
-	err := api.Test(payload)
-	if err != nil {
-		return nil, err
+	if bf == false {
+		err := api.Test(payload)
+		if err != nil {
+			return nil, err
+		}
 	}
 	req, err := http.NewRequest("POST", url, p)
 	if err != nil {

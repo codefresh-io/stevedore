@@ -75,6 +75,15 @@ func setupCommands(app *cli.App) {
 					Value:  "default",
 					EnvVar: "SERVICE_ACCOUNT",
 				},
+				cli.BoolFlag{
+					Name:  "behind-firewall, b",
+					Usage: "Spesify whenever the cluster if behined firewall (only with --context)",
+				},
+				cli.StringFlag{
+					Name:   "name-overwrite",
+					Usage:  "Spesify under which name save the cluster in Codefresh, default is the same name as the context (only with --context)",
+					EnvVar: "NAME_OVERWRITE",
+				},
 			},
 		},
 	}
