@@ -14,7 +14,7 @@ func SetupCli() *cli.App {
 	app.Name = "Stevedore"
 	app.Description = "Integrate your connected clusters to your Codefresh account"
 	app.Email = "olegs@gmail.com"
-	app.Version = "1.1.2"
+	app.Version = "1.1.3"
 	setupCommands(app)
 	return app
 }
@@ -63,6 +63,18 @@ func setupCommands(app *cli.App) {
 					Value:  "https://g.codefresh.io/",
 					EnvVar: "CODEFRESH_URL",
 				},
+				cli.StringFlag{
+					Name: "namespace",
+					Usage:  "Which namespace to use while adding cluster to Codefresh (only with --context)",
+					Value: "default",
+					EnvVar: "NAMESPACE"
+				},
+				cli.StringFlag{
+					Name: "serviceaccount",
+					Usage: "Which service account to use while adding cluster to Codefresh (only with --context)"
+					Value: "default",
+					EnvVar: "SERVICE_ACCOUNT"
+				}
 			},
 		},
 	}
