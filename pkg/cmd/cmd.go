@@ -64,15 +64,15 @@ func setupCommands(app *cli.App) {
 					EnvVar: "CODEFRESH_URL",
 				},
 				cli.StringFlag{
-					Name: "namespace",
+					Name:   "namespace",
 					Usage:  "Which namespace to use while adding cluster to Codefresh (only with --context)",
-					Value: "default",
+					Value:  "default",
 					EnvVar: "NAMESPACE",
 				},
 				cli.StringFlag{
-					Name: "serviceaccount",
-					Usage: "Which service account to use while adding cluster to Codefresh (only with --context)"
-					Value: "default",
+					Name:   "serviceaccount",
+					Usage:  "Which service account to use while adding cluster to Codefresh (only with --context)",
+					Value:  "default",
 					EnvVar: "SERVICE_ACCOUNT",
 				},
 			},
