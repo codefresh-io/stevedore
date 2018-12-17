@@ -16,7 +16,7 @@ import (
 type (
 	API interface {
 		GoOverAllContexts()
-		GoOverContextByName(string, string, string)
+		GoOverContextByName(string, string, string, bool, string)
 		GoOverCurrentContext()
 	}
 
@@ -36,64 +36,78 @@ func getDefaultOverride() clientcmd.ConfigOverrides {
 }
 
 type getOverContextOptions struct {
-	name           string
+	contextName    string
 	namespace      string
 	serviceaccount string
 	config         clientcmd.ClientConfig
 	logger         *log.Entry
 	codefresh      codefresh.API
 	reporter       reporter.Reporter
+	behindFirewall bool
+	name           string
 }
 
 func goOverContext(options *getOverContextOptions) error {
-	clientCnf, e := options.config.ClientConfig()
-	if e != nil {
-		message := fmt.Sprintf("Failed to create config with error:\n%s", e)
-		options.logger.Warn(message)
-		return e
-	}
-	options.logger.Info("Created config for context")
+	var host string
+	var ca []byte
+	var token []byte
+	if options.behindFirewall == false {
+		clientCnf, e := options.config.ClientConfig()
+		if e != nil {
+			message := fmt.Sprintf("Failed to create config with error:\n%s", e)
+			options.logger.Warn(message)
+			return e
+		}
+		options.logger.Info("Created config for context")
+		host = clientCnf.Host
 
-	options.logger.Info("Creating rest client")
-	clientset, e := kubeConfig.NewForConfig(clientCnf)
-	if e != nil {
-		message := fmt.Sprintf("Failed to create kubernetes client with error:\n%s", e)
-		options.logger.Warn(message)
-		return e
-	}
-	options.logger.Info("Created client set for context")
+		options.logger.Info("Creating rest client")
+		clientset, e := kubeConfig.NewForConfig(clientCnf)
+		if e != nil {
+			message := fmt.Sprintf("Failed to create kubernetes client with error:\n%s", e)
+			options.logger.Warn(message)
+			return e
+		}
+		options.logger.Info("Created client set for context")
 
-	options.logger.Info("Fetching service account from cluster")
-	sa, e := clientset.CoreV1().ServiceAccounts(options.namespace).Get(options.serviceaccount, metav1.GetOptions{})
-	if e != nil {
-		message := fmt.Sprintf("Failed to get service account token with error:\n%s", e)
-		options.logger.Warn(message)
-		return e
-	}
-	secretName := string(sa.Secrets[0].Name)
-	namespace := sa.Namespace
-	options.logger.WithFields(log.Fields{
-		"secret_name": secretName,
-		"namespace":   namespace,
-	}).Info(fmt.Sprint("Found service account accisiated with secret"))
+		options.logger.Info("Fetching service account from cluster")
+		sa, e := clientset.CoreV1().ServiceAccounts(options.namespace).Get(options.serviceaccount, metav1.GetOptions{})
+		if e != nil {
+			message := fmt.Sprintf("Failed to get service account token with error:\n%s", e)
+			options.logger.Warn(message)
+			return e
+		}
+		secretName := string(sa.Secrets[0].Name)
+		namespace := sa.Namespace
+		options.logger.WithFields(log.Fields{
+			"secret_name": secretName,
+			"namespace":   namespace,
+		}).Info(fmt.Sprint("Found service account accisiated with secret"))
 
-	options.logger.Info("Fetching secret from cluster")
-	secret, e := clientset.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
-	if e != nil {
-		message := fmt.Sprintf("Failed to get secrets with error:\n%s", e)
-		options.logger.Warn(message)
-		return e
+		options.logger.Info("Fetching secret from cluster")
+		secret, e := clientset.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
+		if e != nil {
+			message := fmt.Sprintf("Failed to get secrets with error:\n%s", e)
+			options.logger.Warn(message)
+			return e
+		}
+		token = secret.Data["token"]
+		ca = secret.Data["ca.crt"]
+		options.logger.Info(fmt.Sprint("Found secret"))
+	} else {
+		host = ""
+		token = nil
+		ca = nil
 	}
-	options.logger.Info(fmt.Sprint("Found secret"))
 
 	options.logger.Info(fmt.Sprint("Creating cluster in Codefresh"))
-	result, e := options.codefresh.Create(clientCnf.Host, options.name, secret.Data["token"], secret.Data["ca.crt"])
+	result, e := options.codefresh.Create(host, options.name, token, ca, options.behindFirewall)
 	if e != nil {
 		message := fmt.Sprintf("Failed to add cluster with error:\n%s", e)
 		options.logger.Error(message)
 		return e
 	}
-	options.reporter.AddToReport(options.name, reporter.SUCCESS, string(result))
+	options.reporter.AddToReport(options.contextName, reporter.SUCCESS, string(result))
 	options.logger.Info(fmt.Sprint("Cluster added!"))
 	return nil
 }
@@ -109,11 +123,13 @@ func (kube *kubernetes) GoOverAllContexts() {
 		override := getDefaultOverride()
 		config := clientcmd.NewNonInteractiveClientConfig(*kube.config, contextName, &override, nil)
 		options := &getOverContextOptions{
-			name:      contextName,
-			config:    config,
-			logger:    logger,
-			codefresh: kube.codefresh,
-			reporter:  kube.reporter,
+			contextName:    contextName,
+			config:         config,
+			logger:         logger,
+			codefresh:      kube.codefresh,
+			reporter:       kube.reporter,
+			behindFirewall: false,
+			name:           contextName,
 		}
 		err := goOverContext(options)
 		if err != nil {
@@ -123,22 +139,30 @@ func (kube *kubernetes) GoOverAllContexts() {
 	}
 }
 
-func (kube *kubernetes) GoOverContextByName(contextName string, namespace string, serviceaccount string) {
-	override := getDefaultOverride()
-	config := clientcmd.NewNonInteractiveClientConfig(*kube.config, contextName, &override, nil)
+func (kube *kubernetes) GoOverContextByName(contextName string, namespace string, serviceaccount string, bf bool, name string) {
+	var override clientcmd.ConfigOverrides
+	var config clientcmd.ClientConfig
+	if bf == false {
+		override = getDefaultOverride()
+		config = clientcmd.NewNonInteractiveClientConfig(*kube.config, contextName, &override, nil)
+	}
 	logger := log.WithFields(log.Fields{
-		"context_name":   contextName,
-		"namespace":      namespace,
-		"serviceaccount": serviceaccount,
+		"context_name":    contextName,
+		"namespace":       namespace,
+		"serviceaccount":  serviceaccount,
+		"behind_firewall": bf,
+		"name":            name,
 	})
 	options := &getOverContextOptions{
-		name:           contextName,
+		contextName:    contextName,
 		config:         config,
 		logger:         logger,
 		codefresh:      kube.codefresh,
 		reporter:       kube.reporter,
 		namespace:      namespace,
 		serviceaccount: serviceaccount,
+		behindFirewall: bf,
+		name:           name,
 	}
 	err := goOverContext(options)
 	if err != nil {
@@ -158,11 +182,13 @@ func (kube *kubernetes) GoOverCurrentContext() {
 		"context_name": contextName,
 	})
 	options := &getOverContextOptions{
-		name:      contextName,
-		config:    config,
-		logger:    logger,
-		codefresh: kube.codefresh,
-		reporter:  kube.reporter,
+		contextName:    contextName,
+		config:         config,
+		logger:         logger,
+		codefresh:      kube.codefresh,
+		reporter:       kube.reporter,
+		behindFirewall: false,
+		name:           contextName,
 	}
 	err = goOverContext(options)
 	if err != nil {

@@ -14,7 +14,7 @@ func SetupCli() *cli.App {
 	app.Name = "Stevedore"
 	app.Description = "Integrate your connected clusters to your Codefresh account"
 	app.Email = "olegs@gmail.com"
-	app.Version = "1.1.3"
+	app.Version = "1.1.4"
 	setupCommands(app)
 	return app
 }
@@ -74,6 +74,15 @@ func setupCommands(app *cli.App) {
 					Usage:  "Which service account to use while adding cluster to Codefresh (only with --context)",
 					Value:  "default",
 					EnvVar: "SERVICE_ACCOUNT",
+				},
+				cli.BoolFlag{
+					Name:  "behind-firewall, b",
+					Usage: "Spesify whenever the cluster is behined firewall (only with --context)",
+				},
+				cli.StringFlag{
+					Name:   "name-overwrite",
+					Usage:  "Spesify under which name save the cluster in Codefresh, default is the same name as the context (only with --context)",
+					EnvVar: "NAME_OVERWRITE",
 				},
 			},
 		},
