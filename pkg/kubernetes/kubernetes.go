@@ -77,6 +77,11 @@ func goOverContext(options *getOverContextOptions) error {
 			options.logger.Warn(message)
 			return e
 		}
+		if sa == nil {
+			message := fmt.Sprintf("Service account: %s not found in namespace: %s", options.serviceaccount, options.namespace)
+			options.logger.Warn(message)
+			return fmt.Errorf(message)
+		}
 		secretName := string(sa.Secrets[0].Name)
 		namespace := sa.Namespace
 		options.logger.WithFields(log.Fields{
