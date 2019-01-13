@@ -51,59 +51,53 @@ func goOverContext(options *getOverContextOptions) error {
 	var host string
 	var ca []byte
 	var token []byte
-	if options.behindFirewall == false {
-		clientCnf, e := options.config.ClientConfig()
-		if e != nil {
-			message := fmt.Sprintf("Failed to create config with error:\n%s", e)
-			options.logger.Warn(message)
-			return e
-		}
-		options.logger.Info("Created config for context")
-		host = clientCnf.Host
-
-		options.logger.Info("Creating rest client")
-		clientset, e := kubeConfig.NewForConfig(clientCnf)
-		if e != nil {
-			message := fmt.Sprintf("Failed to create kubernetes client with error:\n%s", e)
-			options.logger.Warn(message)
-			return e
-		}
-		options.logger.Info("Created client set for context")
-
-		options.logger.Info("Fetching service account from cluster")
-		sa, e := clientset.CoreV1().ServiceAccounts(options.namespace).Get(options.serviceaccount, metav1.GetOptions{})
-		if e != nil {
-			message := fmt.Sprintf("Failed to get service account token with error:\n%s", e)
-			options.logger.Warn(message)
-			return e
-		}
-		if sa == nil {
-			message := fmt.Sprintf("Service account: %s not found in namespace: %s", options.serviceaccount, options.namespace)
-			options.logger.Warn(message)
-			return fmt.Errorf(message)
-		}
-		secretName := string(sa.Secrets[0].Name)
-		namespace := sa.Namespace
-		options.logger.WithFields(log.Fields{
-			"secret_name": secretName,
-			"namespace":   namespace,
-		}).Info(fmt.Sprint("Found service account accisiated with secret"))
-
-		options.logger.Info("Fetching secret from cluster")
-		secret, e := clientset.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
-		if e != nil {
-			message := fmt.Sprintf("Failed to get secrets with error:\n%s", e)
-			options.logger.Warn(message)
-			return e
-		}
-		token = secret.Data["token"]
-		ca = secret.Data["ca.crt"]
-		options.logger.Info(fmt.Sprint("Found secret"))
-	} else {
-		host = ""
-		token = nil
-		ca = nil
+	clientCnf, e := options.config.ClientConfig()
+	if e != nil {
+		message := fmt.Sprintf("Failed to create config with error:\n%s", e)
+		options.logger.Warn(message)
+		return e
 	}
+	options.logger.Info("Created config for context")
+	host = clientCnf.Host
+
+	options.logger.Info("Creating rest client")
+	clientset, e := kubeConfig.NewForConfig(clientCnf)
+	if e != nil {
+		message := fmt.Sprintf("Failed to create kubernetes client with error:\n%s", e)
+		options.logger.Warn(message)
+		return e
+	}
+	options.logger.Info("Created client set for context")
+
+	options.logger.Info("Fetching service account from cluster")
+	sa, e := clientset.CoreV1().ServiceAccounts(options.namespace).Get(options.serviceaccount, metav1.GetOptions{})
+	if e != nil {
+		message := fmt.Sprintf("Failed to get service account token with error:\n%s", e)
+		options.logger.Warn(message)
+		return e
+	}
+	if sa == nil {
+		message := fmt.Sprintf("Service account: %s not found in namespace: %s", options.serviceaccount, options.namespace)
+		options.logger.Warn(message)
+		return fmt.Errorf(message)
+	}
+	secretName := string(sa.Secrets[0].Name)
+	namespace := sa.Namespace
+	options.logger.WithFields(log.Fields{
+		"secret_name": secretName,
+		"namespace":   namespace,
+	}).Info(fmt.Sprint("Found service account accisiated with secret"))
+
+	options.logger.Info("Fetching secret from cluster")
+	secret, e := clientset.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
+	if e != nil {
+		message := fmt.Sprintf("Failed to get secrets with error:\n%s", e)
+		options.logger.Warn(message)
+		return e
+	}
+	token = secret.Data["token"]
+	ca = secret.Data["ca.crt"]
+	options.logger.Info(fmt.Sprint("Found secret"))
 
 	options.logger.Info(fmt.Sprint("Creating cluster in Codefresh"))
 	result, e := options.codefresh.Create(host, options.name, token, ca, options.behindFirewall)
