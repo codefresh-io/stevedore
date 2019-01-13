@@ -141,10 +141,8 @@ func (kube *kubernetes) GoOverAllContexts() {
 func (kube *kubernetes) GoOverContextByName(contextName string, namespace string, serviceaccount string, bf bool, name string) {
 	var override clientcmd.ConfigOverrides
 	var config clientcmd.ClientConfig
-	if bf == false {
-		override = getDefaultOverride()
-		config = clientcmd.NewNonInteractiveClientConfig(*kube.config, contextName, &override, nil)
-	}
+	override = getDefaultOverride()
+	config = clientcmd.NewNonInteractiveClientConfig(*kube.config, contextName, &override, nil)
 	logger := log.WithFields(log.Fields{
 		"context_name":    contextName,
 		"namespace":       namespace,
