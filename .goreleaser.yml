@@ -25,5 +25,3 @@ changelog:
     exclude:
     - '^docs:'
     - '^test:'
-release:
-  name_template: "stevedore_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
