@@ -81,6 +81,11 @@ func goOverContext(options *getOverContextOptions) error {
 		options.logger.Warn(message)
 		return fmt.Errorf(message)
 	}
+	if len(sa.Secrets) == 0 {
+		message := fmt.Sprintf("Service account has no secrect configured for serviceaccount: %s", options.serviceaccount)
+		options.logger.Warn(message)
+		return fmt.Errorf(message)
+	}
 	secretName := string(sa.Secrets[0].Name)
 	namespace := sa.Namespace
 	options.logger.WithFields(log.Fields{
