@@ -41,12 +41,12 @@ func (r *reporter) AddToReport(contextName string, status string, message string
 func (r *reporter) Print() {
 	for _, d := range r.data {
 		if d.status == SUCCESS {
-			fmt.Printf("Context %s created\n", d.name)
+			fmt.Printf("Kubernetes context %s added to Codefresh\n", d.name)
 			continue
 		}
 
 		if d.status == FAILED {
-			fmt.Printf("Failed to create context %s.%s\n", d.name, d.message)
+			fmt.Printf("Failed to add Kubernetes context %s to Codefresh.%s\n", d.name, d.message)
 			continue
 		}
 	}
