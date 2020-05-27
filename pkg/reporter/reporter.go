@@ -1,10 +1,6 @@
 package reporter
 
-import (
-	"os"
-
-	"github.com/olekukonko/tablewriter"
-)
+import "fmt"
 
 const (
 	SUCCESS = "SUCCESS"
@@ -18,24 +14,40 @@ type (
 	}
 
 	reporter struct {
-		table *tablewriter.Table
+		data []struct {
+			name    string
+			status  string
+			message string
+		}
 	}
 )
 
 func NewReporter() Reporter {
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Context Name", "Status", "Message"})
-	table.SetAutoMergeCells(true)
-	table.SetRowLine(true)
-	return &reporter{
-		table: table,
-	}
+	return &reporter{}
 }
 
 func (r *reporter) AddToReport(contextName string, status string, message string) {
-	r.table.Append([]string{contextName, status, message})
+	r.data = append(r.data, struct {
+		name    string
+		status  string
+		message string
+	}{
+		name:    contextName,
+		status:  status,
+		message: message,
+	})
 }
 
 func (r *reporter) Print() {
-	r.table.Render()
+	for _, d := range r.data {
+		if d.status == SUCCESS {
+			fmt.Printf("Context %s created\n", d.name)
+			continue
+		}
+
+		if d.status == FAILED {
+			fmt.Printf("Failed to create context %s.%s\n", d.name, d.message)
+			continue
+		}
+	}
 }
