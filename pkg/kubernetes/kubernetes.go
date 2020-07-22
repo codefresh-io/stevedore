@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeConfig "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -55,7 +56,12 @@ func goOverContext(options *getOverContextOptions) error {
 	if e != nil {
 		message := fmt.Sprintf("Failed to create config with error:\n%s", e)
 		options.logger.Warn(message)
-		return e
+		clientCnf, e = rest.InClusterConfig()
+		if e != nil {
+			message = fmt.Sprintf("Failed to create in cluster config with error:\n%s", e)
+			options.logger.Warn(message)
+			return e
+		}
 	}
 	options.logger.Info("Created config for context")
 	host = clientCnf.Host
@@ -65,6 +71,7 @@ func goOverContext(options *getOverContextOptions) error {
 	if e != nil {
 		message := fmt.Sprintf("Failed to create kubernetes client with error:\n%s", e)
 		options.logger.Warn(message)
+		
 		return e
 	}
 	options.logger.Info("Created client set for context")
