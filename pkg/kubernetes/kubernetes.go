@@ -1,24 +1,28 @@
 package kubernetes
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/codefresh-io/stevedore/pkg/codefresh"
 	"github.com/codefresh-io/stevedore/pkg/reporter"
 	log "github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	kubeConfig "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 )
 
 type (
 	API interface {
-		GoOverAllContexts()
-		GoOverContextByName(string, string, string, bool, string)
-		GoOverCurrentContext()
+		GoOverAllContexts(context.Context)
+		GoOverContextByName(context.Context, string, string, string, bool, string)
+		GoOverCurrentContext(context.Context)
 	}
 
 	kubernetes struct {
@@ -48,7 +52,7 @@ type getOverContextOptions struct {
 	name           string
 }
 
-func goOverContext(options *getOverContextOptions) error {
+func goOverContext(ctx context.Context, options *getOverContextOptions) error {
 	var host string
 	var ca []byte
 	var token []byte
@@ -71,42 +75,20 @@ func goOverContext(options *getOverContextOptions) error {
 	if e != nil {
 		message := fmt.Sprintf("Failed to create kubernetes client with error:\n%s", e)
 		options.logger.Warn(message)
-		
+
 		return e
 	}
 	options.logger.Info("Created client set for context")
 
-	options.logger.Info("Fetching service account from cluster")
-	sa, e := clientset.CoreV1().ServiceAccounts(options.namespace).Get(options.serviceaccount, metav1.GetOptions{})
-	if e != nil {
-		message := fmt.Sprintf("Failed to get service account token with error:\n%s", e)
-		options.logger.Warn(message)
-		return e
-	}
-	if sa == nil {
-		message := fmt.Sprintf("Service account: %s not found in namespace: %s", options.serviceaccount, options.namespace)
-		options.logger.Warn(message)
-		return fmt.Errorf(message)
-	}
-	if len(sa.Secrets) == 0 {
-		message := fmt.Sprintf("Service account has no secrect configured for serviceaccount: %s", options.serviceaccount)
-		options.logger.Warn(message)
-		return fmt.Errorf(message)
-	}
-	secretName := string(sa.Secrets[0].Name)
-	namespace := sa.Namespace
-	options.logger.WithFields(log.Fields{
-		"secret_name": secretName,
-		"namespace":   namespace,
-	}).Info(fmt.Sprint("Found service account accisiated with secret"))
+	options.logger.Info("Generating service account secret")
 
-	options.logger.Info("Fetching secret from cluster")
-	secret, e := clientset.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
-	if e != nil {
-		message := fmt.Sprintf("Failed to get secrets with error:\n%s", e)
-		options.logger.Warn(message)
-		return e
+	secret, err := getServiceAccountTokenSecret(ctx, clientset, options)
+	if err != nil {
+		message := fmt.Sprintf("Failed to generate service account secret: error:\n%s", err.Error())
+		options.logger.Error(message)
+		return err
 	}
+
 	token = secret.Data["token"]
 	ca = secret.Data["ca.crt"]
 	options.logger.Info(fmt.Sprint("Found secret"))
@@ -123,7 +105,70 @@ func goOverContext(options *getOverContextOptions) error {
 	return nil
 }
 
-func (kube *kubernetes) GoOverAllContexts() {
+func getServiceAccountTokenSecret(ctx context.Context, client kubeConfig.Interface, options *getOverContextOptions) (*v1.Secret, error) {
+	saName := options.serviceaccount
+	namespace := options.namespace
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: fmt.Sprintf("%s-token-", saName),
+			Annotations: map[string]string{
+				"kubernetes.io/service-account.name": saName,
+			},
+		},
+		Type: v1.SecretTypeServiceAccountToken,
+	}
+
+	options.logger.Debug("Creating secret for service-account token", "service-account", saName)
+
+	secret, err := client.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create service-account token secret: %w", err)
+	}
+	secretName := secret.Name
+
+	options.logger.Debug("Created secret for service-account token", "service-account", saName, "secret", secret.Name)
+
+	patch := []byte(fmt.Sprintf("{\"secrets\": [{\"name\": \"%s\"}]}", secretName))
+	_, err = client.CoreV1().ServiceAccounts(namespace).Patch(ctx, saName, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to patch service-account with new secret: %w", err)
+	}
+
+	options.logger.Debug("Added secret to service-account secrets", "service-account", saName, "secret", secret.Name)
+
+	// try to read the token from the secret
+	ticker := time.NewTicker(time.Second)
+	retries := 15
+	defer ticker.Stop()
+
+	for try := 0; try < retries; try++ {
+		select {
+		case <-ticker.C:
+			secret, err = client.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+
+		options.logger.Debug("Checking secret for service-account token", "service-account", saName, "secret", secret.Name)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to get service-account secret: %w", err)
+		}
+
+		if secret.Data == nil || len(secret.Data["token"]) == 0 {
+			options.logger.Debug("Secret is missing service-account token", "service-account", saName, "secret", secret.Name)
+			continue
+		}
+
+		options.logger.Debug("Got service-account token from secret", "service-account", saName, "secret", secret.Name)
+
+		return secret, nil
+	}
+
+	return nil, fmt.Errorf("timed out waiting for secret to contain token")
+}
+
+func (kube *kubernetes) GoOverAllContexts(ctx context.Context) {
 	contexts := kube.config.Contexts
 	for contextName := range contexts {
 		logger := log.WithFields(log.Fields{
@@ -142,7 +187,7 @@ func (kube *kubernetes) GoOverAllContexts() {
 			behindFirewall: false,
 			name:           contextName,
 		}
-		err := goOverContext(options)
+		err := goOverContext(ctx, options)
 		if err != nil {
 			kube.reporter.AddToReport(contextName, reporter.FAILED, err.Error())
 			continue
@@ -150,7 +195,7 @@ func (kube *kubernetes) GoOverAllContexts() {
 	}
 }
 
-func (kube *kubernetes) GoOverContextByName(contextName string, namespace string, serviceaccount string, bf bool, name string) {
+func (kube *kubernetes) GoOverContextByName(ctx context.Context, contextName string, namespace string, serviceaccount string, bf bool, name string) {
 	var override clientcmd.ConfigOverrides
 	var config clientcmd.ClientConfig
 	override = getDefaultOverride()
@@ -173,13 +218,13 @@ func (kube *kubernetes) GoOverContextByName(contextName string, namespace string
 		behindFirewall: bf,
 		name:           name,
 	}
-	err := goOverContext(options)
+	err := goOverContext(ctx, options)
 	if err != nil {
 		kube.reporter.AddToReport(contextName, reporter.FAILED, err.Error())
 	}
 }
 
-func (kube *kubernetes) GoOverCurrentContext() {
+func (kube *kubernetes) GoOverCurrentContext(ctx context.Context) {
 	override := getDefaultOverride()
 	config := clientcmd.NewDefaultClientConfig(*kube.config, &override)
 	rawConfig, err := config.RawConfig()
@@ -199,7 +244,7 @@ func (kube *kubernetes) GoOverCurrentContext() {
 		behindFirewall: false,
 		name:           contextName,
 	}
-	err = goOverContext(options)
+	err = goOverContext(ctx, options)
 	if err != nil {
 		kube.reporter.AddToReport(contextName, reporter.FAILED, err.Error())
 	}

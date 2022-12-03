@@ -1,6 +1,8 @@
 package stevedore
 
 import (
+	"context"
+
 	"github.com/codefresh-io/stevedore/pkg/codefresh"
 	"github.com/codefresh-io/stevedore/pkg/kubernetes"
 	"github.com/codefresh-io/stevedore/pkg/reporter"
@@ -10,6 +12,7 @@ import (
 
 func Init(c *cli.Context) {
 	var name string
+	ctx := context.Background()
 	codefreshAPI := codefresh.NewCodefreshAPI(c.String("api-host"), c.String("token"))
 	reporter := reporter.NewReporter()
 	kubernetesAPI := kubernetes.NewKubernetesAPI(c.String("config"), codefreshAPI, reporter)
@@ -21,11 +24,11 @@ func Init(c *cli.Context) {
 		name = runOnContext
 	}
 	if runOnAllContexts {
-		kubernetesAPI.GoOverAllContexts()
+		kubernetesAPI.GoOverAllContexts(ctx)
 	} else if runOnContext != "" {
-		kubernetesAPI.GoOverContextByName(runOnContext, c.String("namespace"), c.String("serviceaccount"), c.Bool("behind-firewall"), name)
+		kubernetesAPI.GoOverContextByName(ctx, runOnContext, c.String("namespace"), c.String("serviceaccount"), c.Bool("behind-firewall"), name)
 	} else {
-		kubernetesAPI.GoOverCurrentContext()
+		kubernetesAPI.GoOverCurrentContext(ctx)
 	}
 	reporter.Print()
 	log.Info("Operation is done, check your account setting")
