@@ -1,4 +1,4 @@
-FROM golang:1.19-alpine3.16 as builder
+FROM golang:1.21-alpine3.20 as builder
 
 # Add basic tools
 RUN apk add --no-cache --update curl bash make git
@@ -19,7 +19,7 @@ COPY . .
 RUN "./scripts/BUILD.sh"
 
 
-FROM alpine:3.16
+FROM alpine:3.20
 
 RUN apk add --no-cache ca-certificates
 
