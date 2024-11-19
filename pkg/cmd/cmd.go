@@ -14,7 +14,7 @@ func SetupCli() *cli.App {
 	app.Name = "Stevedore"
 	app.Description = "Integrate your connected clusters to your Codefresh account"
 	app.Email = "olegs@gmail.com"
-	app.Version = "1.6.1"
+	app.Version = "1.6.2"
 	setupCommands(app)
 	return app
 }
