@@ -1,15 +1,37 @@
 version: '1.0'
+
 steps:
-  BuildingDockerImage:
-    title: Building Docker Image
-    type: build
-    image_name: codefresh/stevedore
-    working_directory: ./
-    dockerfile: Dockerfile
-    tag: '${{CF_BRANCH_TAG_NORMALIZED}}'
-  PushingToDockerRegistry:
-    title: Pushing to Docker Registry
-    type: push
-    candidate: '${{BuildingDockerImage}}'
-    tag: '${{CF_BRANCH_TAG_NORMALIZED}}'
-    registry: dockerhub
+  main_clone:
+    title: Cloning repository...
+    type: git-clone
+    repo: '${{CF_REPO_OWNER}}/${{CF_REPO_NAME}}'
+    revision: '${{CF_REVISION}}'
+
+  create_tag:
+    title: Push tag to git
+    image: codefresh/cli
+    commands:
+      - export VERSION=$(cat VERSION)
+      - export OLD_ORIGIN=$(git remote get-url origin)
+      - git remote rm origin
+      - git remote add origin https://github:${{GITHUB_TOKEN}}@github.com/codefresh-io/stevedore.git
+      - git tag v$VERSION
+      - git push --tags
+      - git remote rm origin
+      - git remote add origin $OLD_ORIGIN
+    when:
+      branch:
+        only:
+        - master
+
+  release:
+    image: goreleaser/goreleaser:v2.4.7
+    working_directory: /go/src/github.com/codefresh-io/stevedore
+    volumes:
+    - ./stevedore:/go/src/github.com/codefresh-io/stevedore
+    commands:
+    - goreleaser release -f .goreleaser.yml --clean
+    when:
+      branch:
+        only:
+        - master
