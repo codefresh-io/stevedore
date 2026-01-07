@@ -1,6 +1,6 @@
 module github.com/codefresh-io/stevedore
 
-go 1.21
+go 1.25
 
 require (
 	github.com/sirupsen/logrus v1.9.3
