@@ -25,7 +25,7 @@ steps:
         - master
 
   release:
-    image: goreleaser/goreleaser:v2.4.7
+    image: goreleaser/goreleaser:v2.13.2
     working_directory: /go/src/github.com/codefresh-io/stevedore
     volumes:
     - ./stevedore:/go/src/github.com/codefresh-io/stevedore
