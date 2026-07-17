@@ -10,7 +10,6 @@ steps:
   export_gh_token:
     title: 'Export GitHub token'
     image: quay.io/codefresh/codefresh-shell:0.4.0
-    stage: prepare
     shell: bash
     commands:
       - source /scripts/get-gh-token.sh
