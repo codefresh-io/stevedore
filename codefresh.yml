@@ -7,6 +7,15 @@ steps:
     repo: '${{CF_REPO_OWNER}}/${{CF_REPO_NAME}}'
     revision: '${{CF_REVISION}}'
 
+  export_gh_token:
+    title: 'Export GitHub token'
+    image: quay.io/codefresh/codefresh-shell:0.4.0
+    stage: prepare
+    shell: bash
+    commands:
+      - source /scripts/get-gh-token.sh
+      - cf_export GITHUB_TOKEN=$GITHUB_TOKEN --mask
+      
   create_tag:
     title: Push tag to git
     image: codefresh/cli
